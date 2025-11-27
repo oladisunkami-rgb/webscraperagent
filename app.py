@@ -17,7 +17,7 @@ if st.button("Scrape and Analyze"):
         try:
             # Configure the Gemini API
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-pro')
+            model = genai.GenerativeModel('gemini-2.5-flash')
 
             # Scrape the website
             response = requests.get(url)
