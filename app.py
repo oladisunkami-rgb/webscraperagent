@@ -1,38 +1,74 @@
 import streamlit as st
-import requests
-from bs4 import BeautifulSoup
-import google.generativeai as genai
 
-# Set up the Streamlit interface
-st.title("Web Scraper Agent")
-st.write("This agent scrapes a website and uses Gemini to analyze the content.")
+# Pre-verified NCC students (Matric : Phone)
+ncc_students = {
+    "HND/NCC/001": "08012345678",
+    "HND/NCC/002": "08087654321",
+    "HND/NCC/003": "08123456789"
+}
 
-# Get user input for the URL and API key
-url = st.text_input("Enter the URL of the website you want to scrape:")
-api_key = st.text_input("Enter your Gemini API Key:", type="password")
+# Use st.cache_resource to create a shared state for all users
+@st.cache_resource
+def get_voting_state():
+    return {
+        "ncc_voted": set(),
+        "ncc_votes": {
+            "Candidate A": 0,
+            "Candidate B": 0
+        }
+    }
 
-# Add a button to trigger the scraping
-if st.button("Scrape and Analyze"):
-    if url and api_key:
-        try:
-            # Configure the Gemini API
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-2.5-flash')
+voting_state = get_voting_state()
 
-            # Scrape the website
-            response = requests.get(url)
-            soup = BeautifulSoup(response.content, 'html.parser')
-            scraped_text = soup.get_text()
 
-            # Use Gemini to analyze the scraped text
-            prompt = f"Summarize the following text from the website {url}:\n\n{scraped_text}"
-            generation = model.generate_content(prompt)
+# Initialize session state variables
+if 'page' not in st.session_state:
+    st.session_state.page = "login"
 
-            # Display the results
-            st.subheader("Scraped Text Summary")
-            st.write(generation.text)
+st.title("NCC HND 1 ONLINE VOTING SYSTEM")
 
-        except Exception as e:
-            st.error(f"An error occurred: {e}")
-    else:
-        st.warning("Please enter both a URL and your Gemini API Key.")
+def login_page():
+    st.header("Login")
+    matric = st.text_input("Enter your Matric Number")
+    phone = st.text_input("Enter your registered mobile number", type="password")
+
+    if st.button("Login"):
+        if matric in ncc_students and phone == ncc_students[matric]:
+            if matric in voting_state["ncc_voted"]:
+                st.warning("You have already voted.")
+            else:
+                st.session_state.page = "voting"
+                st.session_state.matric = matric
+                st.rerun()
+        else:
+            st.error("Invalid Matric Number or mobile number.")
+
+def voting_page():
+    st.header("Candidates")
+    st.write(f"Welcome, {st.session_state.matric}!")
+
+    candidate = st.radio("Choose a candidate:", ("Candidate A", "Candidate B"))
+
+    if st.button("Vote"):
+        voting_state["ncc_votes"][candidate] += 1
+        voting_state["ncc_voted"].add(st.session_state.matric)
+        st.session_state.page = "results"
+        st.rerun()
+
+def results_page():
+    st.header("NCC FINAL RESULTS")
+    for c, v in voting_state["ncc_votes"].items():
+        st.write(f"{c}: {v}")
+
+    if st.button("Logout"):
+        st.session_state.page = "login"
+        st.session_state.matric = ""
+        st.rerun()
+
+
+if st.session_state.page == "login":
+    login_page()
+elif st.session_state.page == "voting":
+    voting_page()
+elif st.session_state.page == "results":
+    results_page()
