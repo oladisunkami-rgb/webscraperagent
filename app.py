@@ -1,38 +1,57 @@
 import streamlit as st
-import requests
-from bs4 import BeautifulSoup
-import google.generativeai as genai
 
-# Set up the Streamlit interface
-st.title("Web Scraper Agent")
-st.write("This agent scrapes a website and uses Gemini to analyze the content.")
+# Initialize session state
+if 'ncc_students' not in st.session_state:
+    st.session_state.ncc_students = {
+        "HND/NCC/001": "08012345678",
+        "HND/NCC/002": "08087654321",
+        "HND/NCC/003": "08123456789"
+    }
+if 'ncc_voted' not in st.session_state:
+    st.session_state.ncc_voted = set()
+if 'ncc_votes' not in st.session_state:
+    st.session_state.ncc_votes = {
+        "Candidate A": 0,
+        "Candidate B": 0
+    }
+if 'logged_in_user' not in st.session_state:
+    st.session_state.logged_in_user = None
 
-# Get user input for the URL and API key
-url = st.text_input("Enter the URL of the website you want to scrape:")
-api_key = st.text_input("Enter your Gemini API Key:", type="password")
+st.title("NCC HND 1 ONLINE VOTING SYSTEM")
 
-# Add a button to trigger the scraping
-if st.button("Scrape and Analyze"):
-    if url and api_key:
-        try:
-            # Configure the Gemini API
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-2.5-flash')
+# Login Form
+if not st.session_state.logged_in_user:
+    st.header("Login")
+    matric = st.text_input("Enter your Matric Number:")
+    phone = st.text_input("Enter your registered mobile number:", type="password")
 
-            # Scrape the website
-            response = requests.get(url)
-            soup = BeautifulSoup(response.content, 'html.parser')
-            scraped_text = soup.get_text()
+    if st.button("Login"):
+        if matric in st.session_state.ncc_students and st.session_state.ncc_students[matric] == phone:
+            if matric in st.session_state.ncc_voted:
+                st.error("❌ You have already voted.")
+            else:
+                st.session_state.logged_in_user = matric
+                st.success("✅ Login successful!")
+                # Rerun to show the voting page
+                st.rerun()
+        else:
+            st.error("❌ Invalid Matric Number or Mobile Number.")
 
-            # Use Gemini to analyze the scraped text
-            prompt = f"Summarize the following text from the website {url}:\n\n{scraped_text}"
-            generation = model.generate_content(prompt)
+# Voting Page
+if st.session_state.logged_in_user and st.session_state.logged_in_user not in st.session_state.ncc_voted:
+    st.header("Candidates")
 
-            # Display the results
-            st.subheader("Scraped Text Summary")
-            st.write(generation.text)
+    candidate_choice = st.radio("Choose a candidate:", list(st.session_state.ncc_votes.keys()))
 
-        except Exception as e:
-            st.error(f"An error occurred: {e}")
-    else:
-        st.warning("Please enter both a URL and your Gemini API Key.")
+    if st.button("Vote"):
+        st.session_state.ncc_votes[candidate_choice] += 1
+        st.session_state.ncc_voted.add(st.session_state.logged_in_user)
+        st.success("✅ Vote successfully recorded!")
+        st.session_state.logged_in_user = None # Log out after voting
+        st.rerun()
+
+
+# Results
+st.header("Live Results")
+for candidate, votes in st.session_state.ncc_votes.items():
+    st.write(f"{candidate}: {votes}")
